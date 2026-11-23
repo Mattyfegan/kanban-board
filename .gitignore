@@ -1,0 +1,28 @@
+# dependencies
+node_modules/
+
+# environment
+.env
+.env.local
+.env.*.local
+
+# next.js
+.next/
+out/
+
+# build artifacts
+dist/
+build/
+
+# testing
+coverage/
+
+# misc
+.DS_Store
+*.log
+
+# turbo
+.turbo/
+
+# prisma (generated client - regenerate with `pnpm db:generate`)
+packages/db/src/generated/

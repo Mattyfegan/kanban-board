@@ -1,0 +1,22 @@
+{
+	"name": "@kanban/ai",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "AI provider contract and the pluggable implementations behind it.",
+	"main": "./src/index.js",
+	"exports": {
+		".": "./src/index.js",
+		"./provider": "./src/provider.js"
+	},
+	"scripts": {
+		"test": "node --test \"src/**/*.test.js\"",
+		"lint": "biome check src"
+	},
+	"dependencies": {
+		"@kanban/config": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.6"
+	}
+}

@@ -1,0 +1,44 @@
+# Local development database for the Kanban Board.
+#
+# This is a dev-only stack - there is no deployment target for this project.
+# The container is intentionally long-lived: it holds the seeded demo data you
+# will be clicking through while building the app.
+#
+#   pnpm docker:up      start (first time, or after a machine reboot)
+#   pnpm docker:down    stop and remove the container (the volume survives)
+#   pnpm docker:logs    tail the Postgres log
+#
+# NEVER run `docker compose down -v`. The named volume holds your real dev
+# data, including the seeded demo board.
+#
+# The port is 5434 because the sibling projects in this workspace already use
+# 5432 (expense-tracker) and 5433 (booking-system).
+
+services:
+  postgres:
+    image: postgres:19-alpine
+    container_name: kanban-board-db
+    restart: unless-stopped
+    ports:
+      - "5434:5432"
+    environment:
+      POSTGRES_USER: kanban
+      POSTGRES_PASSWORD: kanban
+      POSTGRES_DB: kanban_board
+    volumes:
+      # Postgres 18+ images store data in a major-version-specific subdirectory
+      # (e.g. /var/lib/postgresql/19/docker). The volume must therefore be
+      # mounted at /var/lib/postgresql, not at /var/lib/postgresql/data -
+      # mounting the old path makes the image refuse to start.
+      - kanban_postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kanban -d kanban_board"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    stop_grace_period: 10s
+
+volumes:
+  kanban_postgres_data:
+    name: kanban_postgres_data

@@ -1,0 +1,23 @@
+{
+	"name": "@kanban/config",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Shared configuration: environment validation, constants and permission rules.",
+	"main": "./src/index.js",
+	"exports": {
+		".": "./src/index.js",
+		"./environment": "./src/environment.js",
+		"./constants": "./src/constants.js"
+	},
+	"scripts": {
+		"test": "node --test \"src/**/*.test.js\"",
+		"lint": "biome check src"
+	},
+	"dependencies": {
+		"zod": "4.6.7"
+	},
+	"devDependencies": {
+		"@types/node": "26.6.6"
+	}
+}

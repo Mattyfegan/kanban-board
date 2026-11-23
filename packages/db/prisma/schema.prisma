@@ -1,0 +1,24 @@
+// Kanban Board - Prisma schema
+// https://pris.ly/d/prisma-schema
+//
+// The full Kanban data model (projects, boards, columns, tasks, labels,
+// activity) lands in milestone M1. This file starts with the User model
+// because every other record references an author, reporter or assignee.
+
+generator client {
+	provider = "prisma-client"
+	output   = "../src/generated/prisma"
+}
+
+datasource db {
+	provider = "postgresql"
+}
+
+model User {
+	id          String   @id @default(cuid())
+	email       String   @unique
+	name        String
+	avatarColor String   @default("#6366f1")
+	createdAt   DateTime @default(now())
+	updatedAt   DateTime @updatedAt
+}

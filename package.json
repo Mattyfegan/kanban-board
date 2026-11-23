@@ -1,0 +1,45 @@
+{
+	"name": "kanban-board",
+	"private": true,
+	"type": "module",
+	"version": "0.1.0",
+	"description": "A Kanban board web app: projects, boards, custom columns, tasks, priorities, due dates, assignments, drag-and-drop and activity history.",
+	"license": "MIT",
+	"packageManager": "pnpm@12.23.0",
+	"engines": {
+		"node": ">=26.13.1"
+	},
+	"scripts": {
+		"dev": "turbo run dev",
+		"build": "turbo run build",
+		"start": "turbo run start",
+		"lint": "biome check .",
+		"lint:fix": "biome check --write .",
+		"format": "biome format --write .",
+		"test": "turbo run test",
+		"db:generate": "pnpm --filter @kanban/db db:generate",
+		"db:migrate": "pnpm --filter @kanban/db db:migrate",
+		"db:migrate:deploy": "pnpm --filter @kanban/db db:migrate:deploy",
+		"db:seed": "pnpm --filter @kanban/db db:seed",
+		"db:studio": "pnpm --filter @kanban/db db:studio",
+		"docker:up": "docker compose up -d",
+		"docker:down": "docker compose down",
+		"docker:logs": "docker compose logs -f postgres"
+	},
+	"devDependencies": {
+		"@biomejs/biome": "2.6.8",
+		"nano-staged": "1.0.2",
+		"simple-git-hooks": "2.14.0",
+		"tsx": "4.23.15",
+		"turbo": "2.11.13"
+	},
+	"simple-git-hooks": {
+		"pre-commit": "pnpm nano-staged"
+	},
+	"nano-staged": {
+		"**/*.{js,jsx,mjs,json,css}": [
+			"biome format --no-errors-on-unmatched --write",
+			"biome check --no-errors-on-unmatched --write"
+		]
+	}
+}

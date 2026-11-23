@@ -1,0 +1,33 @@
+packages:
+  - apps/*
+  - packages/*
+
+# pnpm 12 replaced the old `onlyBuiltDependencies` list with a map of package
+# matcher to allow/disallow. Anything not listed here is treated as
+# unreviewed and fails the install with ERR_PNPM_IGNORED_BUILDS, which is the
+# point: build scripts run only for packages a human has looked at.
+allowBuilds:
+  "@prisma/client": true
+  "@prisma/engines": true
+  prisma: true
+  esbuild: true
+  simple-git-hooks: true
+
+# Supply-chain guard: only install versions that have been published for at
+# least 24 hours. A malicious or broken release is usually pulled within an
+# hour of being published.
+#
+# strict mode is off because every dependency here is pinned to an exact
+# version - when a pinned version is younger than the guard there is no older
+# version to fall back to. With strict mode off, pnpm installs the pinned
+# version and records it in the exclude list below instead of failing.
+#
+# pnpm adds entries to that list automatically, and `prune` removes the ones
+# that are no longer in the lockfile.
+minimumReleaseAge: 1440
+minimumReleaseAgeStrict: false
+minimumReleaseAgeExcludePrune: true
+minimumReleaseAgeExclude:
+  # lucide-react 1.78.0 was published today. Added automatically by pnpm when
+  # the pin was younger than the 24 hour guard.
+  - lucide-react@1.78.0

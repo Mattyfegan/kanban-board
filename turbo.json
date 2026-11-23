@@ -1,0 +1,51 @@
+{
+	"$schema": "https://v2-11-13.turborepo.dev/schema.json",
+	"ui": "stream",
+	"globalEnv": [
+		"NODE_ENV",
+		"DATABASE_URL",
+		"POSTGRES_HOST",
+		"POSTGRES_PORT",
+		"POSTGRES_USER",
+		"POSTGRES_PASSWORD",
+		"POSTGRES_DB",
+		"AI_PROVIDER",
+		"AI_API_KEY",
+		"AI_BASE_URL",
+		"AI_MODEL"
+	],
+	"tasks": {
+		"build": {
+			"dependsOn": ["^build", "db:generate"],
+			"outputs": [".next/**", "dist/**"]
+		},
+		"lint": {
+			"outputs": []
+		},
+		"test": {
+			"dependsOn": ["^build", "db:generate"],
+			"outputs": []
+		},
+		"dev": {
+			"cache": false,
+			"persistent": true
+		},
+		"db:generate": {
+			"cache": false,
+			"outputs": ["src/generated/**"]
+		},
+		"db:migrate": {
+			"cache": false
+		},
+		"db:migrate:deploy": {
+			"cache": false
+		},
+		"db:seed": {
+			"cache": false
+		},
+		"db:studio": {
+			"cache": false,
+			"persistent": true
+		}
+	}
+}

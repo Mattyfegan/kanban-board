@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/* Tailwind v4 is configured at the CSS layer. The shared primitives in
+   packages/ui are compiled by a different package, so their class names have
+   to be pulled into this stylesheet explicitly. */
+@source "../../../../packages/ui/src/**/*.{js,jsx}";
+
+/* Dark mode is driven by a data attribute on <html>, not by the OS setting. */
+@custom-variant dark (&:is([data-theme="dark"] *));
+
+/*
+ * DESIGN TOKENS
+ *
+ * Two layers:
+ *
+ * 1. NEUTRAL LAYER (:root)
+ *    Structural tokens every component needs - radii, surface colours, text
+ *    colours, borders. Theme independent, so a component never hardcodes a
+ *    colour.
+ *
+ * 2. ACCENT LAYER
+ *    The board's own palette. Override these to retheme the whole app.
+ *
+ * Components consume variables only, never literal colour values.
+ */
+
+:root {
+	/* Shape */
+	--radius: 0.5rem;
+	--radius-lg: 0.75rem;
+
+	/* Surfaces */
+	--surface: #f6f7f9;
+	--surface-raised: #ffffff;
+	--surface-hover: #eef0f4;
+
+	/* Lines */
+	--border: #dfe3e8;
+
+	/* Text */
+	--text: #14181f;
+	--text-muted: #5b6472;
+
+	/* Accent */
+	--accent: #4f46e5;
+	--accent-hover: #4338ca;
+	--accent-contrast: #ffffff;
+
+	/* Status */
+	--info: #1d4ed8;
+	--info-soft: #e0e9ff;
+	--info-border: #c3d3ff;
+
+	--success: #15803d;
+	--success-soft: #dcfce7;
+	--success-border: #bbf7d0;
+
+	--warning: #a16207;
+	--warning-soft: #fef3c7;
+	--warning-border: #fde68a;
+
+	--danger: #b91c1c;
+	--danger-hover: #991b1b;
+	--danger-contrast: #ffffff;
+	--danger-soft: #fee2e2;
+	--danger-border: #fecaca;
+
+	/* Elevation */
+	--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.06);
+	--shadow-md: 0 4px 12px rgb(0 0 0 / 0.08);
+}
+
+[data-theme="dark"] {
+	--surface: #0f1115;
+	--surface-raised: #171a21;
+	--surface-hover: #1f232c;
+
+	--border: #272c36;
+
+	--text: #e8eaed;
+	--text-muted: #9aa3b2;
+
+	--accent: #818cf8;
+	--accent-hover: #a5b4fc;
+	--accent-contrast: #11131a;
+
+	--info: #93b4fd;
+	--info-soft: #17203a;
+	--info-border: #25355c;
+
+	--success: #6ee7a8;
+	--success-soft: #10281c;
+	--success-border: #1c4632;
+
+	--warning: #fcd34d;
+	--warning-soft: #2b2310;
+	--warning-border: #4a3c17;
+
+	--danger: #fca5a5;
+	--danger-hover: #fecaca;
+	--danger-contrast: #1a1111;
+	--danger-soft: #2c1515;
+	--danger-border: #4d2424;
+
+	--shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
+	--shadow-md: 0 4px 12px rgb(0 0 0 / 0.45);
+}
+
+@layer base {
+	html {
+		color-scheme: light;
+	}
+
+	html[data-theme="dark"] {
+		color-scheme: dark;
+	}
+
+	body {
+		background-color: var(--surface);
+		color: var(--text);
+		font-family:
+			ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+			"Helvetica Neue", Arial, sans-serif;
+	}
+}

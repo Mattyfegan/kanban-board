@@ -1,0 +1,13 @@
+# Keep the repository content identical regardless of each contributor's
+# core.autocrlf setting. Every text file is stored and checked out as LF,
+# which is what Biome formats to and what CI on Linux expects.
+* text=auto eol=lf
+
+# Windows scripts must keep CRLF.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Lockfiles and generated files are not worth diffing line by line.
+pnpm-lock.yaml -diff
+packages/db/src/generated/** -diff linguist-generated=true

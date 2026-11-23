@@ -1,0 +1,35 @@
+{
+	"name": "@kanban/db",
+	"version": "0.1.0",
+	"private": true,
+	"type": "module",
+	"description": "Prisma schema, migrations, seed data and query helpers.",
+	"main": "./src/index.js",
+	"exports": {
+		".": "./src/index.js",
+		"./client": "./src/client.js",
+		"./connection": "./src/connection.js"
+	},
+	"scripts": {
+		"db:generate": "prisma generate",
+		"db:migrate": "prisma migrate dev",
+		"db:migrate:deploy": "prisma migrate deploy",
+		"db:seed": "prisma db seed",
+		"db:studio": "prisma studio",
+		"test": "node --import tsx/esm --test \"src/**/*.test.js\"",
+		"lint": "biome check src"
+	},
+	"dependencies": {
+		"@kanban/config": "workspace:*",
+		"@prisma/adapter-pg": "7.10.1",
+		"@prisma/client": "7.10.1",
+		"pg": "8.23.1"
+	},
+	"devDependencies": {
+		"@faker-js/faker": "10.6.0",
+		"@types/node": "26.6.6",
+		"@types/pg": "8.23.1",
+		"prisma": "7.10.1",
+		"tsx": "4.23.15"
+	}
+}
