@@ -2,8 +2,7 @@
 
 A Kanban board web app: **projects, boards, custom columns, tasks, priorities, due dates, assignments, drag-and-drop and activity history.**
 
-This project was built using the [OpenCode](https://opencode.ai) harness with **MiniMax - M3** as the model. 
----
+## This project was built using the [OpenCode](https://opencode.ai) harness with **MiniMax - M3** as the model.
 
 ## Built With
 
@@ -47,13 +46,69 @@ kanban-board/
 │   └── web/              Next.js app - routes, server actions, API routes
 ├── packages/
 │   ├── ai/               AI provider contract and the pluggable providers
-│   ├── config/           Environment validation, constants, logger
+│   ├── config/           Environment validation, permissions, constants, logger
 │   ├── db/               Prisma schema, migrations, seed, query helpers
 │   └── ui/               Shared UI primitives
 ├── scripts/              Test runner
 ├── docker-compose.yml    Local PostgreSQL
 └── turbo.json            Task graph
 ```
+
+## Data model
+
+```mermaid
+erDiagram
+    User ||--o{ Project : owns
+    User ||--o{ ProjectMember : "is a member of"
+    User ||--o{ BoardMember : "is a member of"
+    User ||--o{ Task : "is assigned"
+    User ||--o{ Activity : "performs"
+    Project ||--o{ Board : contains
+    Project ||--o{ ProjectMember : has
+    Board ||--o{ Column : has
+    Board ||--o{ Task : holds
+    Board ||--o{ Label : has
+    Board ||--o{ Activity : "records"
+    Board ||--o{ BoardMember : has
+    Column ||--o{ Task : "holds"
+    Task ||--o{ Task : "parent of (subtasks)"
+    Task ||--o{ TaskLabel : tagged
+    Label ||--o{ TaskLabel : tags
+```
+
+Three decisions in that schema are worth reading before the code:
+
+- **A task carries both `boardId` and `columnId`.** The column is the real
+  foreign key — a task lives in exactly one column — but the board is
+  denormalised onto the row so loading a whole board is one indexed query
+  instead of a join. Moving a card between columns is a single `UPDATE` of two
+  columns, never a delete and recreate.
+- **A column cannot be deleted while it still holds tasks.** The relation is
+  `ON DELETE NO ACTION`, which PostgreSQL checks at the end of the statement.
+  Deleting a column with tasks therefore fails, while deleting a whole board
+  still cascades cleanly — `ON DELETE RESTRICT` would have broken that.
+- **Subtasks are tasks.** A subtask is a task with a `parentId`, so it
+  inherits every field, filter and drag behaviour instead of needing a
+  parallel implementation.
+
+Task ordering is a fractional `position` rather than an integer index: a drop
+between two cards sets the position to the midpoint of theirs, so a drag is a
+single row update. The column is renormalised only when the gap between two
+neighbours collapses below `1e-6`.
+
+## Permissions
+
+Roles are `OWNER`, `EDITOR` and `VIEWER`. The effective role on a board is
+resolved in this order:
+
+1. a platform administrator is an owner everywhere
+2. a `BoardMember.role`, when one is set — it wins, and it may _lower_ a role
+3. otherwise the `ProjectMember.role` is inherited from the project
+4. otherwise the user has no access
+
+The capability matrix is pure data in `@kanban/config`; the database-backed
+resolver lives in `@kanban/db`. The seeded demo data includes both directions
+of override, so the precedence is visible in the app rather than only in tests.
 
 ## Scripts
 
@@ -78,7 +133,9 @@ These are the target feature set. The milestone table in [PLAN.md](./PLAN.md)
 says which one delivers each of them.
 
 - **Projects and boards** — a project holds boards, a board holds custom columns.
+  _Schema and seed data are in place; the screens land in M2._
 - **Tasks** — title, description, priority, due date, assignee, labels, subtasks.
+  _Schema and seed data are in place; the screens land in M3._
 - **Drag and drop** — move cards within a column and across columns, with
   keyboard support, not just a mouse.
 - **Filtering** — by assignee, priority, due date, label and free text, with
@@ -86,6 +143,7 @@ says which one delivers each of them.
 - **Permissions** — project and board membership with OWNER / EDITOR / VIEWER
   roles, enforced on the server for every mutation.
 - **Activity history** — every change recorded with who did it and when.
+  _The log and its schema are in place; the timeline lands in M6._
 - **Live updates** — Server-Sent Events over PostgreSQL notifications.
 - **AI** — suggest subtasks, categorise tasks, draft descriptions. The interface
   and the UI ship with the project; switching on a model is configuration only.

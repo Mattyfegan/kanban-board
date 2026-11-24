@@ -37,7 +37,7 @@
 		"pre-commit": "pnpm nano-staged"
 	},
 	"nano-staged": {
-		"**/*.{js,jsx,mjs,json,css}": [
+		"**/*.{js,jsx,mjs,json,css,md}": [
 			"biome format --no-errors-on-unmatched --write",
 			"biome check --no-errors-on-unmatched --write"
 		]

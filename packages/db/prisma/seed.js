@@ -1,36 +1,27 @@
 import { prisma } from "../src/client.js";
+import { seedDatabase } from "../src/seed.js";
 
 /**
- * Seed data.
+ * Seed entry point.
  *
- * Idempotent by design: every record is created with an upsert keyed on a
- * natural unique field, so running the seed twice leaves the database in
- * exactly the same state. That property is what lets the seed be re-run
- * safely at any point during development.
+ * `prisma db seed` runs this file (see the `migrations.seed` setting in
+ * prisma.config.js). The work itself lives in src/seed.js so that the test
+ * suite can call it directly and assert that it is idempotent.
  *
- * Milestone M0 seeds only the demo user. The project, board, column and task
- * fixtures arrive in M1.
+ * The seed is idempotent: every record is written with an upsert, so running
+ * it twice leaves the database with the same rows and the same values.
  */
-
-const DEMO_USER = {
-	email: "dev@kanban.local",
-	name: "Dev User",
-	avatarColor: "#6366f1",
-};
-
-async function seedDemoUser() {
-	await prisma.user.upsert({
-		where: { email: DEMO_USER.email },
-		update: { name: DEMO_USER.name, avatarColor: DEMO_USER.avatarColor },
-		create: DEMO_USER,
-	});
-}
-
 async function main() {
-	await seedDemoUser();
+	const summary = await seedDatabase({
+		log: (message) => console.log(`  ${message}`),
+	});
 
-	const userCount = await prisma.user.count();
-	console.log(`Seed complete. ${userCount} user(s) in the database.`);
+	console.log(
+		`Seed complete: ${summary.users} users, ${summary.projects} projects, ` +
+			`${summary.boards} boards, ${summary.columns} columns, ` +
+			`${summary.labels} labels, ${summary.tasks} tasks, ` +
+			`${summary.activities} activities.`,
+	);
 }
 
 main()

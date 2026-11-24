@@ -29,7 +29,7 @@ and `pnpm build` all pass.
 
 ---
 
-## M1 — Data model and seed
+## M1 — Data model and seed · **done**
 
 The full Kanban schema, plus realistic demo data.
 
@@ -43,8 +43,8 @@ The full Kanban schema, plus realistic demo data.
   the board is denormalised so a board loads in one indexed query
 - Column deletion never cascades to tasks — the delete action reassigns them
 - Query helper layer in `packages/db/src/queries.js`, grouped by entity
-- Seed: 2 projects, 2 boards, 5 columns each, ~60 tasks across every priority
-  and due-date state, labels, subtasks and a slice of activity history
+- Seed: 2 projects, 3 boards, 15 columns, 61 tasks and 10 subtasks, 11
+  labels, 8 project memberships, 2 board role overrides and 28 activity rows
 - Indexes on `Task(columnId, position)`, `Task(boardId)`, `Task(assigneeId)`,
   `Task(dueDate)`, `Activity(boardId, createdAt)`
 
@@ -203,7 +203,7 @@ stranger can clone the repository and get to a running board in five commands.
 | Milestone | Days       |
 | --------- | ---------- |
 | M0        | 0.5 (done) |
-| M1        | 1          |
+| M1        | 1 (done)   |
 | M2        | 1–1.5      |
 | M3        | 2          |
 | M4        | 1.5        |
@@ -215,7 +215,7 @@ stranger can clone the repository and get to a running board in five commands.
 | M10       | 0.5–1      |
 | **Total** | **12–14**  |
 
-M0–M5 is about six days and yields a fully working board.
+M0–M5 is about seven days and yields a fully working board.
 
 ---
 

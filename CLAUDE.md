@@ -46,14 +46,24 @@ dependency on `@kanban/db`.
 ## Database
 
 - One `packages/db/src/queries.js` layer, grouped by entity, is the only way
-  to touch Prisma from application code.
+  to touch Prisma from application code. The groups are `user`, `project`,
+  `board`, `column`, `task`, `label`, `member`, `activity` and `stats`.
 - The connection string is built in `packages/db/src/connection.js` and used
   by both the Prisma client and the Prisma CLI, so the two can never disagree.
+- Task ordering is fractional. `packages/db/src/ordering.js` holds the pure
+  functions; the server computes the position from the drop index and never
+  trusts a position sent by the client.
+- A column cannot be deleted while it still holds tasks. The relation is
+  `ON DELETE NO ACTION`, which PostgreSQL checks at the end of the statement,
+  so deleting a whole board still cascades cleanly.
 - Migrations are committed. `prisma migrate dev` prompts for a migration name
   — pass `--name <name>` to create one non-interactively. `prisma migrate
   deploy` is the non-interactive path and is what CI uses.
-- The seed is idempotent: it upserts on a natural unique key, so running it
-  twice leaves the database unchanged.
+- The seed is idempotent: every record is written with an upsert, so running
+  it twice leaves the same rows with the same values. Re-running it resets
+  the demo data rather than duplicating it. Due dates are anchored to
+  midnight UTC of the current day, so the demo always shows a realistic mix
+  of overdue, due today and upcoming work.
 
 ## Server Actions
 
@@ -95,9 +105,13 @@ Effective role resolution, highest precedence first:
 3. `ProjectMember.role`, inherited
 4. no access
 
-Ranks: OWNER 3 > EDITOR 2 > VIEWER 1. `assertCan(userId, boardId, capability)`
-in `@kanban/config` is the single enforcement point — call it as the first
-line of every mutation. Hiding a control in the UI is convenience, not
+Ranks: OWNER 3 > EDITOR 2 > VIEWER 1.
+
+The capability matrix lives in `@kanban/config` (`can(role, capability)`,
+`CAPABILITIES_BY_ROLE`) and is pure data, so it can be tested on its own. The
+database-backed half lives in `@kanban/db` (`member.resolveRole(boardId,
+userId)`). Wire the two together in an `assertCan` helper and call it as the
+first line of every mutation — hiding a control in the UI is convenience, not
 security.
 
 ## Testing
@@ -107,6 +121,8 @@ security.
   for tests that need the database.
 - The root runner is `scripts/run-tests.mjs`. It escapes `[` and `]` so Next.js
   route segments are not silently dropped from the run.
+- Integration tests skip themselves when no database is reachable, so
+  `pnpm test` still passes on a machine without one.
 - `packages/db` tests run under `tsx` because the generated Prisma client is
   TypeScript.
 
