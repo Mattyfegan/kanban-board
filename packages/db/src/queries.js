@@ -81,6 +81,20 @@ export const project = {
 		return prisma.project.findUnique({ where: { slug } });
 	},
 
+	/** Whether a slug is already in use. */
+	async slugExists(slug, { excludingId } = {}) {
+		const match = await prisma.project.findUnique({
+			where: { slug },
+			select: { id: true },
+		});
+
+		if (!match) {
+			return false;
+		}
+
+		return excludingId ? match.id !== excludingId : true;
+	},
+
 	/** Every project the user owns or is a member of. */
 	async findAllForUser(userId) {
 		return prisma.project.findMany({
@@ -91,8 +105,20 @@ export const project = {
 			include: {
 				owner: { select: USER_SAFE_SELECT },
 				boards: { orderBy: { sortOrder: "asc" } },
+				members: { include: { user: { select: USER_SAFE_SELECT } } },
 			},
 		});
+	},
+
+	/** The next free sort order for a board added to this project. */
+	async nextBoardSortOrder(projectId) {
+		const last = await prisma.board.findFirst({
+			where: { projectId },
+			orderBy: { sortOrder: "desc" },
+			select: { sortOrder: true },
+		});
+
+		return (last?.sortOrder ?? -1) + 1;
 	},
 
 	async create(data) {
@@ -132,6 +158,74 @@ export const board = {
 		});
 	},
 
+	/**
+	 * The boards of a project, each with the counts the board switcher and
+	 * the project page show.
+	 *
+	 * The task count excludes subtasks and archived tasks, because neither
+	 * appears as a card on the board.
+	 *
+	 * @param {string} projectId
+	 */
+	async findAllForProjectWithCounts(projectId) {
+		return prisma.board.findMany({
+			where: { projectId },
+			orderBy: { sortOrder: "asc" },
+			include: {
+				columns: { orderBy: { sortOrder: "asc" } },
+				_count: { select: { tasks: true } },
+			},
+		});
+	},
+
+	/**
+	 * Whether a board name is already used inside a project.
+	 *
+	 * Board names are unique within a project, so the create and rename
+	 * actions have to check before they write.
+	 *
+	 * @param {string} projectId
+	 * @param {string} name
+	 * @param {string} [excludingId] - Board to ignore, when renaming
+	 */
+	async nameExists(projectId, name, excludingId) {
+		const match = await prisma.board.findFirst({
+			where: {
+				projectId,
+				name,
+				...(excludingId ? { id: { not: excludingId } } : {}),
+			},
+			select: { id: true },
+		});
+
+		return Boolean(match);
+	},
+
+	/**
+	 * Reorders the boards of a project.
+	 *
+	 * The update is scoped to `projectId`, so a caller cannot reorder a board
+	 * belonging to a different project by passing its id in.
+	 *
+	 * @param {string} projectId
+	 * @param {string[]} orderedBoardIds - Board ids, in order
+	 */
+	async reorder(projectId, orderedBoardIds) {
+		await prisma.$transaction(
+			orderedBoardIds.map((id, index) =>
+				prisma.board.updateMany({
+					where: { id, projectId },
+					data: { sortOrder: index },
+				}),
+			),
+		);
+
+		return prisma.board.findMany({
+			where: { projectId },
+			orderBy: { sortOrder: "asc" },
+		});
+	},
+
 	async create(data) {
 		return prisma.board.create({ data });
 	},
@@ -157,11 +251,112 @@ export const column = {
 		return prisma.column.findUnique({ where: { id } });
 	},
 
+	/** A column together with the board it belongs to. */
+	async findByIdWithBoard(id) {
+		return prisma.column.findUnique({
+			where: { id },
+			include: { board: true },
+		});
+	},
+
 	async findAllForBoard(boardId) {
 		return prisma.column.findMany({
 			where: { boardId },
 			orderBy: { sortOrder: "asc" },
 			include: { _count: { select: { tasks: true } } },
+		});
+	},
+
+	/** The next free sort order for a column added to this board. */
+	async nextSortOrder(boardId) {
+		const last = await prisma.column.findFirst({
+			where: { boardId },
+			orderBy: { sortOrder: "desc" },
+			select: { sortOrder: true },
+		});
+
+		return (last?.sortOrder ?? -1) + 1;
+	},
+
+	/**
+	 * Whether a column name is already used on a board.
+	 *
+	 * Column names are unique within a board, so the create and rename
+	 * actions have to check before they write.
+	 *
+	 * @param {string} boardId
+	 * @param {string} name
+	 * @param {string} [excludingId] - Column to ignore, when renaming
+	 */
+	async nameExists(boardId, name, excludingId) {
+		const match = await prisma.column.findFirst({
+			where: {
+				boardId,
+				name,
+				...(excludingId ? { id: { not: excludingId } } : {}),
+			},
+			select: { id: true },
+		});
+
+		return Boolean(match);
+	},
+
+	/**
+	 * Moves a column one place left or right.
+	 *
+	 * The neighbours are swapped rather than renumbered, so a move touches
+	 * two rows however many columns the board has.
+	 *
+	 * @param {string} columnId
+	 * @param {"left" | "right"} direction
+	 * @returns {Promise<Array<{ id: string, sortOrder: number }>>} The board's
+	 *   columns in their new order
+	 */
+	async move(columnId, direction) {
+		return prisma.$transaction(async (tx) => {
+			const column = await tx.column.findUnique({
+				where: { id: columnId },
+				select: { id: true, boardId: true, sortOrder: true },
+			});
+
+			if (!column) {
+				throw new Error(`Cannot move column ${columnId}: it does not exist.`);
+			}
+
+			const columns = await tx.column.findMany({
+				where: { boardId: column.boardId },
+				orderBy: { sortOrder: "asc" },
+				select: { id: true, sortOrder: true },
+			});
+
+			const index = columns.findIndex((entry) => entry.id === columnId);
+
+			if (index === -1) {
+				throw new Error(
+					`Cannot move column ${columnId}: it is not part of board ${column.boardId}.`,
+				);
+			}
+
+			const target = direction === "left" ? index - 1 : index + 1;
+
+			if (target < 0 || target >= columns.length) {
+				return columns;
+			}
+
+			const swapped = [...columns];
+			[swapped[index], swapped[target]] = [swapped[target], swapped[index]];
+
+			for (const [position, entry] of swapped.entries()) {
+				await tx.column.update({
+					where: { id: entry.id },
+					data: { sortOrder: position },
+				});
+			}
+
+			return swapped.map((entry, position) => ({
+				id: entry.id,
+				sortOrder: position,
+			}));
 		});
 	},
 
@@ -516,6 +711,129 @@ export const member = {
 	},
 
 	/**
+	 * Everyone who can reach a board, and the role they hold on it.
+	 *
+	 * A board override wins over the inherited project role, and it may lower
+	 * a role as well as raise it. The project owner is always included, and
+	 * is always an owner on the board unless a BoardMember row says
+	 * otherwise.
+	 *
+	 * @param {string} boardId
+	 * @returns {Promise<Array<{
+	 *   user: object,
+	 *   role: "OWNER" | "EDITOR" | "VIEWER",
+	 *   source: "board" | "project" | "owner",
+	 *   override: "OWNER" | "EDITOR" | "VIEWER" | null
+	 * }>>}
+	 */
+	async listEffectiveMembers(boardId) {
+		const board = await prisma.board.findUnique({
+			where: { id: boardId },
+			select: {
+				id: true,
+				projectId: true,
+				ownerId: true,
+				project: {
+					select: {
+						members: {
+							include: { user: { select: USER_SAFE_SELECT } },
+						},
+					},
+				},
+				members: {
+					include: { user: { select: USER_SAFE_SELECT } },
+					orderBy: { createdAt: "asc" },
+				},
+			},
+		});
+
+		if (!board) {
+			return [];
+		}
+
+		const overrides = new Map(
+			board.members.map((entry) => [entry.userId, entry]),
+		);
+
+		const inherited = new Map(
+			board.project.members.map((entry) => [entry.userId, entry]),
+		);
+
+		// The owner is a member of the project by definition, even when no
+		// ProjectMember row says so.
+		if (!inherited.has(board.ownerId)) {
+			const owner = await prisma.user.findUnique({
+				where: { id: board.ownerId },
+				select: USER_SAFE_SELECT,
+			});
+
+			if (owner) {
+				inherited.set(board.ownerId, {
+					userId: board.ownerId,
+					role: "OWNER",
+					user: owner,
+				});
+			}
+		}
+
+		const userIds = new Set([...overrides.keys(), ...inherited.keys()]);
+		const members = [];
+
+		for (const userId of userIds) {
+			const override = overrides.get(userId);
+			const projectMember = inherited.get(userId);
+			const person = override?.user ?? projectMember?.user;
+
+			if (!person) {
+				continue;
+			}
+
+			members.push({
+				user: person,
+				role: override?.role ?? projectMember?.role ?? "VIEWER",
+				source: override ? "board" : projectMember ? "project" : "owner",
+				override: override?.role ?? null,
+			});
+		}
+
+		const rank = { OWNER: 0, EDITOR: 1, VIEWER: 2 };
+
+		members.sort(
+			(a, b) =>
+				rank[a.role] - rank[b.role] || a.user.name.localeCompare(b.user.name),
+		);
+
+		return members;
+	},
+
+	/**
+	 * The users who could be added to a board: everyone who is not already
+	 * on it.
+	 *
+	 * @param {string} boardId
+	 */
+	async listAddableUsers(boardId) {
+		const board = await prisma.board.findUnique({
+			where: { id: boardId },
+			select: { projectId: true },
+		});
+
+		if (!board) {
+			return [];
+		}
+
+		const existing = await this.listEffectiveMembers(boardId);
+		const existingIds = new Set(existing.map((entry) => entry.user.id));
+
+		const candidates = await prisma.user.findMany({
+			orderBy: { name: "asc" },
+			select: USER_SAFE_SELECT,
+		});
+
+		return candidates.filter((candidate) => !existingIds.has(candidate.id));
+	},
+
+	/**
 	 * The effective role a user holds on a board.
 	 *
 	 * Precedence, highest first:
@@ -609,6 +927,89 @@ export const stats = {
 			overdue,
 			open: tasks - completed,
 		};
+	},
+
+	/**
+	 * The counts for one project, shown on the project detail page.
+	 *
+	 * @param {string} projectId
+	 * @returns {Promise<{ boards: number, tasks: number, subtasks: number, open: number, completed: number, overdue: number, members: number }>}
+	 */
+	async forProject(projectId) {
+		const boards = await prisma.board.findMany({
+			where: { projectId },
+			select: { id: true },
+		});
+
+		const boardIds = boards.map((entry) => entry.id);
+
+		const [tasks, subtasks, completed, overdue, members] = await Promise.all([
+			prisma.task.count({
+				where: { boardId: { in: boardIds }, parentId: null },
+			}),
+			prisma.task.count({
+				where: { boardId: { in: boardIds }, parentId: { not: null } },
+			}),
+			prisma.task.count({
+				where: {
+					boardId: { in: boardIds },
+					parentId: null,
+					completedAt: { not: null },
+				},
+			}),
+			prisma.task.count({
+				where: {
+					boardId: { in: boardIds },
+					parentId: null,
+					completedAt: null,
+					dueDate: { lt: new Date() },
+				},
+			}),
+			prisma.projectMember.count({ where: { projectId } }),
+		]);
+
+		return {
+			boards: boardIds.length,
+			tasks,
+			subtasks,
+			completed,
+			overdue,
+			members,
+			open: tasks - completed,
+		};
+	},
+
+	/**
+	 * The counts for one board, shown in the board header.
+	 *
+	 * @param {string} boardId
+	 * @returns {Promise<{ tasks: number, completed: number, overdue: number }>}
+	 */
+	async forBoard(boardId) {
+		const [tasks, completed, overdue] = await Promise.all([
+			prisma.task.count({
+				where: { boardId, parentId: null, isArchived: false },
+			}),
+			prisma.task.count({
+				where: {
+					boardId,
+					parentId: null,
+					isArchived: false,
+					completedAt: { not: null },
+				},
+			}),
+			prisma.task.count({
+				where: {
+					boardId,
+					parentId: null,
+					isArchived: false,
+					completedAt: null,
+					dueDate: { lt: new Date() },
+				},
+			}),
+		]);
+
+		return { tasks, completed, overdue, open: tasks - completed };
 	},
 };
 
