@@ -1,154 +1,168 @@
-import { getAiStatus } from "@kanban/ai";
-import { stats } from "@kanban/db";
+import { project, stats } from "@kanban/db";
 import {
 	Badge,
-	Button,
 	Card,
 	CardBody,
 	CardHeader,
 	CardTitle,
+	EmptyState,
 } from "@kanban/ui";
-import { Database, LayoutDashboard, Sparkles } from "lucide-react";
+import { Archive, FolderKanban, LayoutDashboard } from "lucide-react";
+import Link from "next/link";
 import { connection } from "next/server";
+import { CreateProjectForm } from "@/components/create-project-form";
+import { getCurrentUser } from "@/lib/session";
 
 /**
- * Placeholder dashboard.
+ * The project dashboard.
  *
- * This page exists to prove the whole stack is wired end to end: a Server
- * Component reading real rows through the query layer in @kanban/db, shared
- * primitives rendered from @kanban/ui, and the AI provider reporting its
- * status. The real project dashboard arrives in M2.
+ * The landing page: every project the current user can reach, with the
+ * boards inside each one. A project the user owns or is a member of
+ * appears here; anything else does not.
  *
- * `connection()` forces this route to render per request. Without it Next
- * would prerender the page at build time and freeze the figures into the
- * static output, which is wrong for anything reflecting live state.
+ * `connection()` forces the route to render per request, because the
+ * contents depend on who is signed in and on live rows.
  */
-export default async function HomePage() {
+export default async function DashboardPage() {
 	await connection();
 
-	const database = await stats
-		.overview()
-		.then((overview) => ({ reachable: true, overview }))
-		.catch((error) => ({
-			reachable: false,
-			overview: null,
-			message: error instanceof Error ? error.message : String(error),
-		}));
-
-	const ai = getAiStatus();
-	const overview = database.overview;
+	const currentUser = await getCurrentUser();
+	const projects = currentUser
+		? await project.findAllForUser(currentUser.id)
+		: [];
+	const overview = await stats.overview();
 
 	return (
-		<main className="mx-auto flex min-h-screen w-full max-w-3xl flex-col gap-8 px-6 py-16">
-			<header className="flex flex-col gap-3">
-				<Badge tone="info">Milestone M1 - data model</Badge>
-				<h1 className="text-3xl font-bold tracking-tight">Kanban Board</h1>
-				<p className="text-(--text-muted)">
-					Projects, boards, custom columns, tasks, priorities, due dates,
-					assignments, drag-and-drop and activity history.
-				</p>
+		<div className="mx-auto w-full max-w-5xl px-6 py-8">
+			<header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+				<div className="flex flex-col gap-2">
+					<Badge tone="info">Milestone M2 - projects and boards</Badge>
+					<h1 className="text-2xl font-bold tracking-tight">Your projects</h1>
+					<p className="max-w-xl text-sm text-(--text-muted)">
+						{currentUser
+							? `Signed in as ${currentUser.name}. Switch the user in the sidebar to see the board as somebody else.`
+							: "There is no user to sign in as. Run the seed to create the demo users."}
+					</p>
+				</div>
+
+				<CreateProjectForm />
 			</header>
 
-			{overview ? (
-				<div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-					<Card>
-						<CardHeader>
-							<CardTitle className="flex items-center gap-2">
-								<LayoutDashboard className="size-4" aria-hidden="true" />
-								Projects
-							</CardTitle>
-						</CardHeader>
-						<CardBody>
-							<p className="text-2xl font-semibold text-(--text)">
-								{overview.projects}
-							</p>
-							<p className="mt-1">{overview.boards} boards</p>
-						</CardBody>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<CardTitle>Tasks</CardTitle>
-						</CardHeader>
-						<CardBody>
-							<p className="text-2xl font-semibold text-(--text)">
-								{overview.tasks}
-							</p>
-							<p className="mt-1">{overview.subtasks} subtasks</p>
-						</CardBody>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<CardTitle>Open</CardTitle>
-						</CardHeader>
-						<CardBody>
-							<p className="text-2xl font-semibold text-(--text)">
-								{overview.open}
-							</p>
-							<p className="mt-1">{overview.completed} completed</p>
-						</CardBody>
-					</Card>
-
-					<Card>
-						<CardHeader>
-							<CardTitle>Overdue</CardTitle>
-						</CardHeader>
-						<CardBody>
-							<p className="text-2xl font-semibold text-(--danger)">
-								{overview.overdue}
-							</p>
-							<p className="mt-1">past their due date</p>
-						</CardBody>
-					</Card>
-				</div>
-			) : null}
-
-			<div className="grid gap-4 sm:grid-cols-2">
+			<div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
 				<Card>
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2">
-							<Database className="size-4" aria-hidden="true" />
-							Database
+							<LayoutDashboard className="size-4" aria-hidden="true" />
+							Projects
 						</CardTitle>
-						<Badge tone={database.reachable ? "success" : "danger"}>
-							{database.reachable ? "connected" : "unreachable"}
-						</Badge>
 					</CardHeader>
 					<CardBody>
-						{database.reachable
-							? `PostgreSQL is reachable. ${overview.users} users in the database.`
-							: `PostgreSQL is not reachable: ${database.message}`}
+						<p className="text-2xl font-semibold text-(--text)">
+							{overview.projects}
+						</p>
+						<p className="mt-1">{overview.boards} boards</p>
 					</CardBody>
 				</Card>
 
 				<Card>
 					<CardHeader>
-						<CardTitle className="flex items-center gap-2">
-							<Sparkles className="size-4" aria-hidden="true" />
-							AI provider
-						</CardTitle>
-						<Badge tone={ai.available ? "success" : "neutral"}>
-							{ai.available ? "available" : "disabled"}
-						</Badge>
+						<CardTitle>Tasks</CardTitle>
 					</CardHeader>
 					<CardBody>
-						Provider <code className="font-mono">{ai.id}</code> is active. The
-						AI surface is wired end to end; switching on a model is a
-						configuration change.
+						<p className="text-2xl font-semibold text-(--text)">
+							{overview.tasks}
+						</p>
+						<p className="mt-1">{overview.subtasks} subtasks</p>
+					</CardBody>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Open</CardTitle>
+					</CardHeader>
+					<CardBody>
+						<p className="text-2xl font-semibold text-(--text)">
+							{overview.open}
+						</p>
+						<p className="mt-1">{overview.completed} completed</p>
+					</CardBody>
+				</Card>
+
+				<Card>
+					<CardHeader>
+						<CardTitle>Overdue</CardTitle>
+					</CardHeader>
+					<CardBody>
+						<p className="text-2xl font-semibold text-(--danger)">
+							{overview.overdue}
+						</p>
+						<p className="mt-1">past their due date</p>
 					</CardBody>
 				</Card>
 			</div>
 
-			<div className="flex items-center gap-3">
-				<Button disabled>
-					<LayoutDashboard className="size-4" aria-hidden="true" />
-					Boards arrive in M2
-				</Button>
-				<Button variant="secondary" href="/api/health">
-					Check health endpoint
-				</Button>
-			</div>
-		</main>
+			<section className="mt-8">
+				<h2 className="text-sm font-semibold tracking-wide text-(--text-muted) uppercase">
+					Projects
+				</h2>
+
+				{projects.length === 0 ? (
+					<EmptyState
+						className="mt-3"
+						title="No projects yet"
+						description="Create a project to hold your boards, columns and tasks."
+					/>
+				) : (
+					<div className="mt-3 grid gap-4 lg:grid-cols-2">
+						{projects.map((entry) => (
+							<Card key={entry.id}>
+								<CardHeader>
+									<CardTitle className="flex items-center gap-2">
+										<FolderKanban className="size-4" aria-hidden="true" />
+										<Link
+											href={`/projects/${entry.id}`}
+											className="hover:text-(--accent) hover:underline"
+										>
+											{entry.name}
+										</Link>
+									</CardTitle>
+									<Badge tone="neutral">{entry.key}</Badge>
+								</CardHeader>
+								<CardBody>
+									{entry.description ? (
+										<p className="text-sm text-(--text-muted)">
+											{entry.description}
+										</p>
+									) : (
+										<p className="text-sm text-(--text-muted) italic">
+											No description.
+										</p>
+									)}
+
+									<ul className="mt-3 flex flex-col gap-1">
+										{entry.boards.map((board) => (
+											<li key={board.id}>
+												<Link
+													href={`/boards/${board.id}`}
+													className="inline-flex items-center gap-1.5 text-sm text-(--text) hover:text-(--accent) hover:underline"
+												>
+													{board.isArchived ? (
+														<Archive
+															className="size-3.5 text-(--text-muted)"
+															aria-hidden="true"
+														/>
+													) : null}
+													{board.name}
+												</Link>
+											</li>
+										))}
+									</ul>
+								</CardBody>
+							</Card>
+						))}
+					</div>
+				)}
+			</section>
+		</div>
 	);
 }
